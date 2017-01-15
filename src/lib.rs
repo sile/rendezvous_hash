@@ -5,7 +5,7 @@
 //! # Examples
 //!
 //! ```
-//! use RendezvousNodes;
+//! use rendezvous_hash::RendezvousNodes;
 //!
 //! // Constructs a node (a.k.a., server, site, etc) set.
 //! let mut nodes = RendezvousNodes::default();
@@ -28,12 +28,10 @@
 //! assert_eq!(nodes.calc_candidates(&"key").collect::<Vec<_>>(),
 //!            [&"qux", &"bar", &"foo"]);
 //! ```
-use std::hash::{Hash, Hasher, BuildHasher};
-use std::hash::BuildHasherDefault;
+#![warn(missing_docs)]
+use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
-use std::slice;
-use std::iter;
 
 mod iterators_impl;
 
@@ -61,10 +59,16 @@ pub trait NodeHasher<N> {
 /// (as follows).
 ///
 /// ```no_run
+/// use std::collections::hash_map::DefaultHasher;
+/// # use std::hash::{Hash, Hasher};
+/// # let item = ();
+/// # let node = ();
+///
 /// let mut hasher = DefaultHasher::new();
 /// item.hash(&mut hasher);
 /// node.hash(&mut hasher);
 /// hasher.finish()
+/// # ;
 /// ```
 #[derive(Debug, Clone)]
 pub struct DefaultNodeHasher {
@@ -90,7 +94,7 @@ impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {
 /// # Examples
 ///
 /// ```
-/// use RendezvousNodes;
+/// use rendezvous_hash::RendezvousNodes;
 ///
 /// // Constructs a node (a.k.a., server, site, etc) set.
 /// let mut nodes = RendezvousNodes::default();
@@ -223,9 +227,11 @@ impl Capacity {
 /// # Examples
 ///
 /// ```
-/// use HeterogeneousRendezvousNodes;
+/// use std::collections::HashMap;
+/// use rendezvous_hash::Capacity;
+/// use rendezvous_hash::HeterogeneousRendezvousNodes;
 ///
-/// let mut nodes = NonUniformRendezvousNodes::default();
+/// let mut nodes = HeterogeneousRendezvousNodes::default();
 /// nodes.insert("foo", Capacity::new(70).unwrap());
 /// nodes.insert("bar", Capacity::new(20).unwrap());
 /// nodes.insert("baz", Capacity::new(9).unwrap());
@@ -233,8 +239,8 @@ impl Capacity {
 ///
 /// let mut counts = HashMap::new();
 /// for item in 0..10000 {
-///     let point = nodes.calc_candidates(&item).nth(0).unwrap();
-///     *counts.entry(point.0.to_string()).or_insert(0) += 1;
+///     let node = nodes.calc_candidates(&item).nth(0).unwrap();
+///     *counts.entry(node.0.to_string()).or_insert(0) += 1;
 /// }
 /// assert_eq!(((counts["foo"] as f64) / 100.0).round(), 70.0);
 /// assert_eq!(((counts["bar"] as f64) / 100.0).round(), 20.0);
@@ -242,13 +248,13 @@ impl Capacity {
 /// assert_eq!(((counts["qux"] as f64) / 100.0).round(), 1.0);
 /// ```
 #[derive(Debug, Clone)]
-pub struct HeterogeneousRendezvousNodes<P, H> {
-    nodes: Vec<(P, Capacity)>,
+pub struct HeterogeneousRendezvousNodes<N, H> {
+    nodes: Vec<(N, Capacity)>,
     hasher: H,
 }
-impl<P, H> HeterogeneousRendezvousNodes<P, H>
-    where P: PartialEq + Hash,
-          H: BuildHasher
+impl<N, H> HeterogeneousRendezvousNodes<N, H>
+    where N: PartialEq + Hash,
+          H: for<'a> NodeHasher<(&'a N, u16)>
 {
     /// Makes a new `HeterogeneousRendezvousNodes` instance.
     pub fn new(hasher: H) -> Self {
@@ -257,44 +263,67 @@ impl<P, H> HeterogeneousRendezvousNodes<P, H>
             hasher: hasher,
         }
     }
-    pub fn insert(&mut self, point: P, capacity: Capacity) -> Option<(P, Capacity)> {
-        let old = self.remove(&point);
-        self.nodes.push((point, capacity));
+
+    /// Returns the count of the candidate nodes.
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    /// Inserts a new candidate node which has the capacity `capacity`.
+    ///
+    /// If a node which equals to `node` exists,
+    /// it will be removed and returned as `Some((N, Capacity))`.
+    pub fn insert(&mut self, node: N, capacity: Capacity) -> Option<(N, Capacity)> {
+        let old = self.remove(&node);
+        self.nodes.push((node, capacity));
         old
     }
-    pub fn remove<Q>(&mut self, point: &Q) -> Option<(P, Capacity)>
-        where P: Borrow<Q>,
-              Q: PartialEq
+
+    /// Removes the specified node from the candidates.
+    ///
+    /// If the node does not exist, this method will return `None`.
+    pub fn remove<M>(&mut self, node: &M) -> Option<(N, Capacity)>
+        where N: Borrow<M>,
+              M: PartialEq
     {
-        if let Some(i) = self.nodes.iter().position(|p| p.0.borrow() == point) {
+        if let Some(i) = self.nodes.iter().position(|n| n.0.borrow() == node) {
             Some(self.nodes.swap_remove(i))
         } else {
             None
         }
     }
-    pub fn hasher(&self) -> H::Hasher {
-        self.hasher.build_hasher()
+
+    /// Returns `true` if the specified node exists in this candidate set, otherwise `false`.
+    pub fn contains<M>(&self, node: &M) -> bool
+        where N: Borrow<M>,
+              M: PartialEq
+    {
+        self.nodes.iter().any(|n| n.0.borrow() == node)
     }
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(P, Capacity)> {
-        let builder = &self.hasher;
-        self.nodes.sort_by_key(|&(ref p, capacity)| {
+
+    /// Returns the candidate nodes for `item`.
+    ///
+    /// The higher priority node is located in front of the returned candidate sequence.
+    ///
+    /// Note that this method takes `O(n * m + n log n)` steps
+    /// (where `n` is the return value of `self.len()` and
+    /// `m` is the maximum value among the capacities of the nodes.)
+    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(N, Capacity)> {
+        let hasher = &self.hasher;
+        self.nodes.sort_by_key(|&(ref n, capacity)| {
             (0..capacity.0)
-                .map(|i| {
-                    let mut hasher = builder.build_hasher();
-                    (item, p, i).hash(&mut hasher);
-                    hasher.finish()
-                })
+                .map(|i| hasher.hash(&(n, i), item))
                 .max()
                 .unwrap()
         });
         iterators_impl::candidates(self.nodes.iter().rev())
     }
 }
-impl<P> Default for HeterogeneousRendezvousNodes<P, BuildHasherDefault<DefaultHasher>>
-    where P: PartialEq + Hash
+impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
+    where N: PartialEq + Hash
 {
     fn default() -> Self {
-        Self::new(BuildHasherDefault::default())
+        Self::new(DefaultNodeHasher::new())
     }
 }
 
@@ -331,8 +360,8 @@ mod tests {
         nodes.insert("baz");
         let mut counts = HashMap::new();
         for item in 0..1000 {
-            let point = nodes.calc_candidates(&item).nth(0).unwrap();
-            *counts.entry(point.to_string()).or_insert(0) += 1;
+            let node = nodes.calc_candidates(&item).nth(0).unwrap();
+            *counts.entry(node.to_string()).or_insert(0) += 1;
         }
         assert_eq!(counts["foo"], 246);
         assert_eq!(counts["bar"], 266);
@@ -341,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn weighted_nodes() {
+    fn heterogeneous_nodes() {
         let mut nodes = HeterogeneousRendezvousNodes::default();
         nodes.insert("foo", Capacity::new(70).unwrap());
         nodes.insert("bar", Capacity::new(20).unwrap());
@@ -350,8 +379,8 @@ mod tests {
 
         let mut counts = HashMap::new();
         for item in 0..10000 {
-            let point = nodes.calc_candidates(&item).nth(0).unwrap();
-            *counts.entry(point.0.to_string()).or_insert(0) += 1;
+            let node = nodes.calc_candidates(&item).nth(0).unwrap();
+            *counts.entry(node.0.to_string()).or_insert(0) += 1;
         }
         assert_eq!(((counts["foo"] as f64) / 100.0).round(), 70.0);
         assert_eq!(((counts["bar"] as f64) / 100.0).round(), 20.0);
