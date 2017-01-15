@@ -38,6 +38,8 @@ mod iterators_impl;
 pub mod iterators {
     //! `Iterator` trait implementations.
 
+    pub use iterators_impl::Iter;
+    pub use iterators_impl::IntoIter;
     pub use iterators_impl::Candidates;
 }
 
@@ -134,11 +136,21 @@ impl<N, H> RendezvousNodes<N, H>
         }
     }
 
-    /// Returns the count of the candidate nodes.
-    pub fn len(&self) -> usize {
-        self.nodes.len()
+    /// Returns the candidate nodes for `item`.
+    ///
+    /// The higher priority node is located in front of the returned candidate sequence.
+    ///
+    /// Note that this method takes `O(n log n)` steps
+    /// (where `n` is the return value of `self.len()`).
+    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<N> {
+        let hasher = &self.hasher;
+        self.nodes.sort_by_key(|n| hasher.hash(n, item));
+        iterators_impl::candidates(self.nodes.iter().rev())
     }
-
+}
+impl<N, H> RendezvousNodes<N, H>
+    where N: PartialEq + Hash
+{
     /// Inserts a new candidate node.
     ///
     /// If a node which equals to `node` exists, it will be removed and returned as `Some(N)`.
@@ -169,18 +181,16 @@ impl<N, H> RendezvousNodes<N, H>
     {
         self.nodes.iter().any(|n| n.borrow() == node)
     }
-    /// TODO: iter, into_iter, from_iter
+}
+impl<N, H> RendezvousNodes<N, H> {
+    /// Returns the count of the candidate nodes.
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
 
-    /// Returns the candidate nodes for `item`.
-    ///
-    /// The higher priority node is located in front of the returned candidate sequence.
-    ///
-    /// Note that this method takes `O(n log n)` steps
-    /// (where `n` is the return value of `self.len()`).
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<N> {
-        let hasher = &self.hasher;
-        self.nodes.sort_by_key(|n| hasher.hash(n, item));
-        iterators_impl::candidates(self.nodes.iter().rev())
+    /// Returns an iterator over the nodes of this candidate set.
+    pub fn iter(&self) -> iterators::Iter<N> {
+        iterators_impl::iter(self.nodes.iter())
     }
 }
 impl<N> Default for RendezvousNodes<N, DefaultNodeHasher>
@@ -190,7 +200,24 @@ impl<N> Default for RendezvousNodes<N, DefaultNodeHasher>
         Self::new(DefaultNodeHasher::new())
     }
 }
-
+impl<N, H> IntoIterator for RendezvousNodes<N, H> {
+    type Item = N;
+    type IntoIter = iterators::IntoIter<N>;
+    fn into_iter(self) -> Self::IntoIter {
+        iterators_impl::into_iter(self.nodes.into_iter())
+    }
+}
+impl<N, H> Extend<N> for RendezvousNodes<N, H>
+    where N: PartialEq + Hash
+{
+    fn extend<T>(&mut self, iter: T)
+        where T: IntoIterator<Item = N>
+    {
+        for n in iter {
+            let _ = self.insert(n);
+        }
+    }
+}
 
 /// The capacity of a node.
 ///
@@ -264,11 +291,27 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
         }
     }
 
-    /// Returns the count of the candidate nodes.
-    pub fn len(&self) -> usize {
-        self.nodes.len()
+    /// Returns the candidate nodes for `item`.
+    ///
+    /// The higher priority node is located in front of the returned candidate sequence.
+    ///
+    /// Note that this method takes `O(n * m + n log n)` steps
+    /// (where `n` is the return value of `self.len()` and
+    /// `m` is the maximum value among the capacities of the nodes.)
+    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(N, Capacity)> {
+        let hasher = &self.hasher;
+        self.nodes.sort_by_key(|&(ref n, capacity)| {
+            (0..capacity.0)
+                .map(|i| hasher.hash(&(n, i), item))
+                .max()
+                .unwrap()
+        });
+        iterators_impl::candidates(self.nodes.iter().rev())
     }
-
+}
+impl<N, H> HeterogeneousRendezvousNodes<N, H>
+    where N: PartialEq + Hash
+{
     /// Inserts a new candidate node which has the capacity `capacity`.
     ///
     /// If a node which equals to `node` exists,
@@ -300,23 +343,16 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     {
         self.nodes.iter().any(|n| n.0.borrow() == node)
     }
+}
+impl<N, H> HeterogeneousRendezvousNodes<N, H> {
+    /// Returns the count of the candidate nodes.
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
 
-    /// Returns the candidate nodes for `item`.
-    ///
-    /// The higher priority node is located in front of the returned candidate sequence.
-    ///
-    /// Note that this method takes `O(n * m + n log n)` steps
-    /// (where `n` is the return value of `self.len()` and
-    /// `m` is the maximum value among the capacities of the nodes.)
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(N, Capacity)> {
-        let hasher = &self.hasher;
-        self.nodes.sort_by_key(|&(ref n, capacity)| {
-            (0..capacity.0)
-                .map(|i| hasher.hash(&(n, i), item))
-                .max()
-                .unwrap()
-        });
-        iterators_impl::candidates(self.nodes.iter().rev())
+    /// Returns an iterator over the nodes of this candidate set.
+    pub fn iter(&self) -> iterators::Iter<(N, Capacity)> {
+        iterators_impl::iter(self.nodes.iter())
     }
 }
 impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
@@ -324,6 +360,24 @@ impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
 {
     fn default() -> Self {
         Self::new(DefaultNodeHasher::new())
+    }
+}
+impl<N, H> IntoIterator for HeterogeneousRendezvousNodes<N, H> {
+    type Item = (N, Capacity);
+    type IntoIter = iterators::IntoIter<(N, Capacity)>;
+    fn into_iter(self) -> Self::IntoIter {
+        iterators_impl::into_iter(self.nodes.into_iter())
+    }
+}
+impl<N, H> Extend<(N, Capacity)> for HeterogeneousRendezvousNodes<N, H>
+    where N: PartialEq + Hash
+{
+    fn extend<T>(&mut self, iter: T)
+        where T: IntoIterator<Item = (N, Capacity)>
+    {
+        for (n, c) in iter {
+            let _ = self.insert(n, c);
+        }
     }
 }
 
