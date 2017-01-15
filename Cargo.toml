@@ -2,5 +2,12 @@
 name = "rendezvous_hash"
 version = "0.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
+description = "An implementation of Rendezvous hashing algorithm"
+documentation = "https://docs.rs/rendezvous_hash"
+homepage = "https://github.com/sile/rendezvous_hash"
+repository = "https://github.com/sile/rendezvous_hash"
+readme = "README.md"
+keywords = ["distributed", "hash"]
+license = "MIT"
 
 [dependencies]
