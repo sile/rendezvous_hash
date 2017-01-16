@@ -33,7 +33,10 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
 
+use node::Node;
+
 mod iterators_impl;
+mod node;
 
 pub mod iterators {
     //! `Iterator` trait implementations.
@@ -119,7 +122,7 @@ impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {
 /// ```
 #[derive(Debug, Clone)]
 pub struct RendezvousNodes<N, H> {
-    nodes: Vec<N>,
+    nodes: Vec<Node<N>>,
     hasher: H,
 }
 impl<N, H> RendezvousNodes<N, H>
@@ -142,7 +145,10 @@ impl<N, H> RendezvousNodes<N, H>
     /// (where `n` is the return value of `self.len()`).
     pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<N> {
         let hasher = &self.hasher;
-        self.nodes.sort_by_key(|n| hasher.hash(n, item));
+        for n in self.nodes.iter_mut() {
+            n.update_hash(hasher, &item);
+        }
+        self.nodes.sort_by_key(|n| n.hash);
         iterators_impl::candidates(self.nodes.iter().rev())
     }
 }
@@ -154,7 +160,7 @@ impl<N, H> RendezvousNodes<N, H>
     /// If a node which equals to `node` exists, it will be removed and returned as `Some(N)`.
     pub fn insert(&mut self, node: N) -> Option<N> {
         let old = self.remove(&node);
-        self.nodes.push(node);
+        self.nodes.push(Node::new(node));
         old
     }
 
@@ -165,8 +171,8 @@ impl<N, H> RendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        if let Some(i) = self.nodes.iter().position(|n| n.borrow() == node) {
-            Some(self.nodes.swap_remove(i))
+        if let Some(i) = self.nodes.iter().position(|n| n.node.borrow() == node) {
+            Some(self.nodes.swap_remove(i).node)
         } else {
             None
         }
@@ -177,7 +183,7 @@ impl<N, H> RendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        self.nodes.iter().any(|n| n.borrow() == node)
+        self.nodes.iter().any(|n| n.node.borrow() == node)
     }
 }
 impl<N, H> RendezvousNodes<N, H> {
@@ -274,7 +280,7 @@ impl Capacity {
 /// ```
 #[derive(Debug, Clone)]
 pub struct HeterogeneousRendezvousNodes<N, H> {
-    nodes: Vec<(N, Capacity)>,
+    nodes: Vec<Node<(N, Capacity)>>,
     hasher: H,
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H>
@@ -297,13 +303,11 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     /// (where `n` is the return value of `self.len()` and
     /// `m` is the maximum value among the capacities of the nodes.)
     pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(N, Capacity)> {
-        let hasher = &self.hasher;
-        self.nodes.sort_by_key(|&(ref n, capacity)| {
-            (0..capacity.0)
-                .map(|i| hasher.hash(&(n, i), item))
-                .max()
-                .unwrap()
-        });
+        for n in self.nodes.iter_mut() {
+            let capacity = n.node.1;
+            n.update_hash_with_capacity(&self.hasher, item, capacity);
+        }
+        self.nodes.sort_by_key(|n| n.hash);
         iterators_impl::candidates(self.nodes.iter().rev())
     }
 }
@@ -316,7 +320,7 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     /// it will be removed and returned as `Some((N, Capacity))`.
     pub fn insert(&mut self, node: N, capacity: Capacity) -> Option<(N, Capacity)> {
         let old = self.remove(&node);
-        self.nodes.push((node, capacity));
+        self.nodes.push(Node::new((node, capacity)));
         old
     }
 
@@ -327,8 +331,8 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        if let Some(i) = self.nodes.iter().position(|n| n.0.borrow() == node) {
-            Some(self.nodes.swap_remove(i))
+        if let Some(i) = self.nodes.iter().position(|n| n.node.0.borrow() == node) {
+            Some(self.nodes.swap_remove(i).node)
         } else {
             None
         }
@@ -339,7 +343,7 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        self.nodes.iter().any(|n| n.0.borrow() == node)
+        self.nodes.iter().any(|n| n.node.0.borrow() == node)
     }
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H> {
