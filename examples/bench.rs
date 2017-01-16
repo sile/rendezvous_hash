@@ -53,6 +53,8 @@ fn main() {
     println!("");
 
     let elapsed = end_time - start_time;
-    println!("ELAPSED: {} ms",
-             elapsed.as_secs() * 1000 + (elapsed.subsec_nanos() / 1_000_000) as u64);
+    let elapsed_micros = elapsed.as_secs() * 1_000_000 + (elapsed.subsec_nanos() / 1000) as u64;
+    println!("ELAPSED: {} ms", elapsed_micros / 1000);
+    println!("WORDS PER SECOND: {}",
+             (((words.len() as f64) / (elapsed_micros as f64)) * 1_000_000.0) as u64);
 }
