@@ -10,3 +10,40 @@ A Rust implementation of Rendezvous (a.k.a, highest random weight) hashing algor
 [Documentation](https://docs.rs/rendezvous_hash)
 
 Reference: [Rendezvous hashing (Wikipedia)](https://en.wikipedia.org/wiki/Rendezvous_hashing)
+
+
+An Informal Benchmark
+----------------------
+
+```sh
+$ cat /proc/cpuinfo  | grep 'model name' | head -1
+model name      : Intel(R) Core(TM) i7-6600U CPU @ 2.60GHz
+
+$ uname -a
+Linux ubuntu 4.8.0-34-generic #36-Ubuntu SMP Wed Dec 21 17:24:18 UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+
+$ cargo run --release --example bench -- /usr/share/dict/words --nodes Rust Alef C++ Camlp4 CommonLisp Erlang Haskell Hermes Limbo Napier Napier88 Newsqueak NIL Sather StandardML
+
+WORD COUNT: 99156
+NODE COUNT: 15
+
+SELECTED COUNT PER NODE:
+- Napier88:     6711
+- Haskell:      6607
+- StandardML:   6622
+- CommonLisp:   6621
+- Newsqueak:    6693
+- C++:  6605
+- Sather:       6495
+- Limbo:        6704
+- Camlp4:       6536
+- Erlang:       6594
+- Napier:       6685
+- Rust:         6568
+- NIL:  6514
+- Hermes:       6667
+- Alef:         6534
+
+ELAPSED: 84 ms
+WORDS PER SECOND: 1177303
+```
