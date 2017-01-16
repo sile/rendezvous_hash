@@ -73,13 +73,11 @@ pub trait NodeHasher<N> {
 /// # ;
 /// ```
 #[derive(Debug, Clone)]
-pub struct DefaultNodeHasher {
-    _dummy: (),
-}
+pub struct DefaultNodeHasher(());
 impl DefaultNodeHasher {
     /// Makes a new `DefaultNodeHasher` instance.
     pub fn new() -> Self {
-        DefaultNodeHasher { _dummy: () }
+        DefaultNodeHasher(())
     }
 }
 impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {

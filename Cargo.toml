@@ -10,4 +10,5 @@ readme = "README.md"
 keywords = ["distributed", "hash"]
 license = "MIT"
 
-[dependencies]
+[dev-dependencies]
+clap = "2.20"
