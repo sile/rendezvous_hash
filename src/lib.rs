@@ -126,7 +126,7 @@ pub struct RendezvousNodes<N, H> {
     hasher: H,
 }
 impl<N, H> RendezvousNodes<N, H>
-    where N: PartialEq + Hash,
+    where N: PartialEq + Ord + Hash,
           H: NodeHasher<N>
 {
     /// Makes a new `RendezvousNodes` instance.
@@ -148,8 +148,8 @@ impl<N, H> RendezvousNodes<N, H>
         for n in self.nodes.iter_mut() {
             n.update_hash(hasher, &item);
         }
-        self.nodes.sort_by_key(|n| n.hash);
-        iterators_impl::candidates(self.nodes.iter().rev())
+        self.nodes.sort_by(|a, b| (b.hash, &b.node).cmp(&(a.hash, &a.node)));
+        iterators_impl::candidates(self.nodes.iter())
     }
 }
 impl<N, H> RendezvousNodes<N, H>
@@ -198,7 +198,7 @@ impl<N, H> RendezvousNodes<N, H> {
     }
 }
 impl<N> Default for RendezvousNodes<N, DefaultNodeHasher>
-    where N: PartialEq + Hash
+    where N: PartialEq + Ord + Hash
 {
     fn default() -> Self {
         Self::new(DefaultNodeHasher::new())
@@ -284,7 +284,7 @@ pub struct HeterogeneousRendezvousNodes<N, H> {
     hasher: H,
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H>
-    where N: PartialEq + Hash,
+    where N: PartialEq + Ord + Hash,
           H: for<'a> NodeHasher<(&'a N, u16)>
 {
     /// Makes a new `HeterogeneousRendezvousNodes` instance.
@@ -307,8 +307,8 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
             let capacity = n.node.1;
             n.update_hash_with_capacity(&self.hasher, item, capacity);
         }
-        self.nodes.sort_by_key(|n| n.hash);
-        iterators_impl::candidates(self.nodes.iter().rev())
+        self.nodes.sort_by(|a, b| (b.hash, &b.node.0).cmp(&(a.hash, &a.node.0)));
+        iterators_impl::candidates(self.nodes.iter())
     }
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H>
@@ -358,7 +358,7 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H> {
     }
 }
 impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
-    where N: PartialEq + Hash
+    where N: PartialEq + Ord + Hash
 {
     fn default() -> Self {
         Self::new(DefaultNodeHasher::new())

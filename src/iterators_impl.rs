@@ -1,5 +1,4 @@
 use std::vec;
-use std::iter;
 use std::slice;
 
 use node::Node;
@@ -36,14 +35,14 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-pub fn candidates<'a, T: 'a>(inner: iter::Rev<slice::Iter<'a, Node<T>>>) -> Candidates<T> {
+pub fn candidates<'a, T: 'a>(inner: slice::Iter<'a, Node<T>>) -> Candidates<T> {
     Candidates(inner)
 }
 
 /// An iterator which represents a sequence of the candidate nodes for a rendezvous.
 ///
 /// The higher priority node is placed in front of this sequence.
-pub struct Candidates<'a, T: 'a>(iter::Rev<slice::Iter<'a, Node<T>>>);
+pub struct Candidates<'a, T: 'a>(slice::Iter<'a, Node<T>>);
 impl<'a, T: 'a> Iterator for Candidates<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
