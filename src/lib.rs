@@ -29,8 +29,9 @@
 //!            [&"qux", &"bar", &"foo"]);
 //! ```
 #![warn(missing_docs)]
+extern crate siphasher;
+
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
 
 use node::Node;
@@ -54,8 +55,8 @@ pub trait NodeHasher<N> {
 
 /// The default `NodeHasher` implementation.
 ///
-/// This uses `DefaultHasher` to hash nodes and items.
-/// `DefaultHasher` is provided by Rust standard library.
+/// This uses `SipHasher13` to hash nodes and items.
+/// `SipHasher13` is provided by `siphash` crate.
 ///
 /// To hash a combination of a node and an item,
 /// `DefaultNodeHasher` hashes the item at first,
@@ -64,16 +65,18 @@ pub trait NodeHasher<N> {
 /// (as follows).
 ///
 /// ```no_run
-/// use std::collections::hash_map::DefaultHasher;
+/// # extern crate siphasher;
+/// use siphasher::sip::SipHasher13;
 /// # use std::hash::{Hash, Hasher};
+/// # fn main() {
 /// # let item = ();
 /// # let node = ();
-///
-/// let mut hasher = DefaultHasher::new();
+/// let mut hasher = SipHasher13::new();
 /// item.hash(&mut hasher);
 /// node.hash(&mut hasher);
 /// hasher.finish()
 /// # ;
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct DefaultNodeHasher(());
@@ -85,7 +88,7 @@ impl DefaultNodeHasher {
 }
 impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {
     fn hash<T: Hash>(&self, node: &N, item: &T) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = siphasher::sip::SipHasher13::new();
         item.hash(&mut hasher);
         node.hash(&mut hasher);
         hasher.finish()
