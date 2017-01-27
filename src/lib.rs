@@ -32,7 +32,10 @@
 extern crate siphasher;
 
 use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
+
+pub use node::KeyValueNode;
 
 use node::Node;
 
@@ -55,8 +58,8 @@ pub trait NodeHasher<N> {
 
 /// The default `NodeHasher` implementation.
 ///
-/// This uses `SipHasher13` to hash nodes and items.
-/// `SipHasher13` is provided by `siphash` crate.
+/// This uses `DefaultHasher` to hash nodes and items.
+/// `DefaultHasher` is provided by Rust standard library.
 ///
 /// To hash a combination of a node and an item,
 /// `DefaultNodeHasher` hashes the item at first,
@@ -65,18 +68,16 @@ pub trait NodeHasher<N> {
 /// (as follows).
 ///
 /// ```no_run
-/// # extern crate siphasher;
-/// use siphasher::sip::SipHasher13;
+/// use std::collections::hash_map::DefaultHasher;
 /// # use std::hash::{Hash, Hasher};
-/// # fn main() {
 /// # let item = ();
 /// # let node = ();
-/// let mut hasher = SipHasher13::new();
+///
+/// let mut hasher = DefaultHasher::new();
 /// item.hash(&mut hasher);
 /// node.hash(&mut hasher);
 /// hasher.finish()
 /// # ;
-/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct DefaultNodeHasher(());
@@ -88,7 +89,7 @@ impl DefaultNodeHasher {
 }
 impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {
     fn hash<T: Hash>(&self, node: &N, item: &T) -> u64 {
-        let mut hasher = siphasher::sip::SipHasher13::new();
+        let mut hasher = DefaultHasher::new();
         item.hash(&mut hasher);
         node.hash(&mut hasher);
         hasher.finish()
@@ -426,6 +427,19 @@ mod tests {
         assert_eq!(counts["bar"], 266);
         assert_eq!(counts["baz"], 237);
         assert_eq!(counts["qux"], 251);
+    }
+
+    #[test]
+    fn kv_nodes() {
+        let mut nodes = RendezvousNodes::default();
+        nodes.insert(KeyValueNode::new("foo", ()));
+        nodes.insert(KeyValueNode::new("bar", ()));
+        nodes.insert(KeyValueNode::new("baz", ()));
+        nodes.insert(KeyValueNode::new("qux", ()));
+        assert_eq!(nodes.calc_candidates(&1).map(|n| &n.key).collect::<Vec<_>>(),
+                   [&"bar", &"baz", &"foo", &"qux"]);
+        assert_eq!(nodes.calc_candidates(&"key").map(|n| &n.key).collect::<Vec<_>>(),
+                   [&"qux", &"bar", &"foo", &"baz"]);
     }
 
     #[test]

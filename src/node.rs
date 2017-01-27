@@ -1,4 +1,5 @@
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::cmp;
 
 use super::{Capacity, NodeHasher};
 
@@ -30,5 +31,49 @@ impl<T: Hash> Node<(T, Capacity)> {
     {
         let hash = (0..capacity.0).map(|i| hasher.hash(&(&self.node.0, i), item)).max().unwrap();
         self.hash = hash;
+    }
+}
+
+/// Key-Value node.
+///
+/// Only key is used for calculating the hash value of a node.
+#[derive(Debug, Clone)]
+pub struct KeyValueNode<K, V> {
+    /// The key of this node.
+    pub key: K,
+
+    /// The value of this node.
+    pub value: V,
+}
+impl<K, V> KeyValueNode<K, V>
+    where K: Hash + Ord + PartialEq
+{
+    /// Makes a new `KeyValueNode` instance.
+    pub fn new(key: K, value: V) -> Self {
+        KeyValueNode {
+            key: key,
+            value: value,
+        }
+    }
+}
+impl<K: Hash, V> Hash for KeyValueNode<K, V> {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.key.hash(hasher);
+    }
+}
+impl<K: PartialEq, V> PartialEq for KeyValueNode<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+impl<K: PartialEq, V> Eq for KeyValueNode<K, V> {}
+impl<K: PartialOrd, V> PartialOrd for KeyValueNode<K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.key.partial_cmp(&other.key)
+    }
+}
+impl<K: Ord, V> Ord for KeyValueNode<K, V> {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.key.cmp(&other.key)
     }
 }
