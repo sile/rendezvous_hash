@@ -37,7 +37,7 @@ use std::borrow::Borrow;
 
 pub use node::KeyValueNode;
 
-use node::Node;
+use node::{Node, WeightedNode};
 
 mod iterators_impl;
 mod node;
@@ -45,9 +45,20 @@ mod node;
 pub mod iterators {
     //! `Iterator` trait implementations.
 
-    pub use iterators_impl::Iter;
-    pub use iterators_impl::IntoIter;
-    pub use iterators_impl::Candidates;
+    pub mod homogeneous {
+        //! Iterators for homogeneous nodes.
+        pub use iterators_impl::Iter;
+        pub use iterators_impl::IntoIter;
+        pub use iterators_impl::Candidates;
+    }
+
+    pub mod heterogeneous {
+        //! Iterators for heterogeneous nodes.
+
+        pub use iterators_impl::heterogeneous::Iter;
+        pub use iterators_impl::heterogeneous::IntoIter;
+        pub use iterators_impl::heterogeneous::Candidates;
+    }
 }
 
 /// This trait allows calculating the hash value of a node for a specific item.
@@ -147,12 +158,12 @@ impl<N, H> RendezvousNodes<N, H>
     ///
     /// Note that this method takes `O(n log n)` steps
     /// (where `n` is the return value of `self.len()`).
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<N> {
+    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::homogeneous::Candidates<N> {
         let hasher = &self.hasher;
         for n in self.nodes.iter_mut() {
             n.update_hash(hasher, &item);
         }
-        self.nodes.sort_by(|a, b| (b.hash, &b.node).cmp(&(a.hash, &a.node)));
+        self.nodes.sort_by(|a, b| (b.hash, &b.node).partial_cmp(&(a.hash, &a.node)).unwrap());
         iterators_impl::candidates(self.nodes.iter())
     }
 }
@@ -197,7 +208,7 @@ impl<N, H> RendezvousNodes<N, H> {
     }
 
     /// Returns an iterator over the nodes of this candidate set.
-    pub fn iter(&self) -> iterators::Iter<N> {
+    pub fn iter(&self) -> iterators::homogeneous::Iter<N> {
         iterators_impl::iter(self.nodes.iter())
     }
 }
@@ -210,7 +221,7 @@ impl<N> Default for RendezvousNodes<N, DefaultNodeHasher>
 }
 impl<N, H> IntoIterator for RendezvousNodes<N, H> {
     type Item = N;
-    type IntoIter = iterators::IntoIter<N>;
+    type IntoIter = iterators::homogeneous::IntoIter<N>;
     fn into_iter(self) -> Self::IntoIter {
         iterators_impl::into_iter(self.nodes.into_iter())
     }
@@ -235,13 +246,13 @@ impl<N, H> Extend<N> for RendezvousNodes<N, H>
 /// For example, if the capacity of a node is twice the other,
 /// the former may be selected by items twice as many times as the latter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Capacity(u16);
+pub struct Capacity(u32);
 impl Capacity {
     /// Makes a new `Capacity` instance.
     ///
     /// Note that `capacity` must be a non zero value.
     /// If `0` is passed, this method will returns `None`.
-    pub fn new(capacity: u16) -> Option<Self> {
+    pub fn new(capacity: u32) -> Option<Self> {
         if capacity == 0 {
             None
         } else {
@@ -250,7 +261,7 @@ impl Capacity {
     }
 
     /// Returns the value of this instance.
-    pub fn value(&self) -> u16 {
+    pub fn value(&self) -> u32 {
         self.0
     }
 }
@@ -284,12 +295,12 @@ impl Capacity {
 /// ```
 #[derive(Debug, Clone)]
 pub struct HeterogeneousRendezvousNodes<N, H> {
-    nodes: Vec<Node<(N, Capacity)>>,
+    nodes: Vec<WeightedNode<N>>,
     hasher: H,
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H>
     where N: PartialEq + Ord + Hash,
-          H: for<'a> NodeHasher<(&'a N, u16)>
+          H: NodeHasher<N>
 {
     /// Makes a new `HeterogeneousRendezvousNodes` instance.
     pub fn new(hasher: H) -> Self {
@@ -306,13 +317,15 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     /// Note that this method takes `O(n * m + n log n)` steps
     /// (where `n` is the return value of `self.len()` and
     /// `m` is the maximum value among the capacities of the nodes.)
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<(N, Capacity)> {
+    pub fn calc_candidates<T: Hash>(&mut self,
+                                    item: &T)
+                                    -> iterators::heterogeneous::Candidates<N> {
         for n in self.nodes.iter_mut() {
-            let capacity = n.node.1;
-            n.update_hash_with_capacity(&self.hasher, item, capacity);
+            n.update_hash(&self.hasher, item);
         }
-        self.nodes.sort_by(|a, b| (b.hash, &b.node.0).cmp(&(a.hash, &a.node.0)));
-        iterators_impl::candidates(self.nodes.iter())
+        self.nodes
+            .sort_by(|a, b| (b.hash, &b.node).partial_cmp(&(a.hash, &a.node)).unwrap());
+        iterators_impl::heterogeneous::candidates(self.nodes.iter())
     }
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H>
@@ -324,7 +337,7 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     /// it will be removed and returned as `Some((N, Capacity))`.
     pub fn insert(&mut self, node: N, capacity: Capacity) -> Option<(N, Capacity)> {
         let old = self.remove(&node);
-        self.nodes.push(Node::new((node, capacity)));
+        self.nodes.push(WeightedNode::new(node, capacity));
         old
     }
 
@@ -335,8 +348,8 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        if let Some(i) = self.nodes.iter().position(|n| n.node.0.borrow() == node) {
-            Some(self.nodes.swap_remove(i).node)
+        if let Some(i) = self.nodes.iter().position(|n| n.node.borrow() == node) {
+            Some(self.nodes.swap_remove(i).into_tuple())
         } else {
             None
         }
@@ -347,7 +360,7 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
         where N: Borrow<M>,
               M: PartialEq
     {
-        self.nodes.iter().any(|n| n.node.0.borrow() == node)
+        self.nodes.iter().any(|n| n.node.borrow() == node)
     }
 }
 impl<N, H> HeterogeneousRendezvousNodes<N, H> {
@@ -357,8 +370,8 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H> {
     }
 
     /// Returns an iterator over the nodes of this candidate set.
-    pub fn iter(&self) -> iterators::Iter<(N, Capacity)> {
-        iterators_impl::iter(self.nodes.iter())
+    pub fn iter(&self) -> iterators::heterogeneous::Iter<N> {
+        iterators_impl::heterogeneous::iter(self.nodes.iter())
     }
 }
 impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
@@ -370,9 +383,9 @@ impl<N> Default for HeterogeneousRendezvousNodes<N, DefaultNodeHasher>
 }
 impl<N, H> IntoIterator for HeterogeneousRendezvousNodes<N, H> {
     type Item = (N, Capacity);
-    type IntoIter = iterators::IntoIter<(N, Capacity)>;
+    type IntoIter = iterators::heterogeneous::IntoIter<N>;
     fn into_iter(self) -> Self::IntoIter {
-        iterators_impl::into_iter(self.nodes.into_iter())
+        iterators_impl::heterogeneous::into_iter(self.nodes.into_iter())
     }
 }
 impl<N, H> Extend<(N, Capacity)> for HeterogeneousRendezvousNodes<N, H>

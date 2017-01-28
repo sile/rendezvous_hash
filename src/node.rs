@@ -22,15 +22,34 @@ impl<T: Hash> Node<T> {
         self.hash = hash;
     }
 }
-impl<T: Hash> Node<(T, Capacity)> {
-    pub fn update_hash_with_capacity<H, U: Hash>(&mut self,
-                                                 hasher: &H,
-                                                 item: &U,
-                                                 capacity: Capacity)
-        where H: for<'a> NodeHasher<(&'a T, u16)>
-    {
-        let hash = (0..capacity.0).map(|i| hasher.hash(&(&self.node.0, i), item)).max().unwrap();
-        self.hash = hash;
+
+#[derive(Debug, Clone)]
+pub struct WeightedNode<T> {
+    pub node: T,
+    pub capacity: Capacity,
+    pub hash: f64,
+}
+impl<T> WeightedNode<T> {
+    pub fn new(node: T, capacity: Capacity) -> Self {
+        WeightedNode {
+            node: node,
+            capacity: capacity,
+            hash: 0.0,
+        }
+    }
+}
+impl<T: Hash> WeightedNode<T> {
+    pub fn update_hash<H: NodeHasher<T>, U: Hash>(&mut self, hasher: &H, item: &U) {
+        // Uses "Logarithmic Method" described in "Weighted Distributed Hash Tables"
+        use std::u64::MAX;
+        let hash = hasher.hash(&self.node, item) as f64;
+        let distance = (hash / MAX as f64).ln();
+        self.hash = distance / self.capacity.value() as f64;
+    }
+}
+impl<T> WeightedNode<T> {
+    pub fn into_tuple(self) -> (T, Capacity) {
+        (self.node, self.capacity)
     }
 }
 
