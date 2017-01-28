@@ -9,7 +9,13 @@ A Rust implementation of Rendezvous (a.k.a, highest random weight) hashing algor
 
 [Documentation](https://docs.rs/rendezvous_hash)
 
-Reference: [Rendezvous hashing (Wikipedia)](https://en.wikipedia.org/wiki/Rendezvous_hashing)
+
+References
+----------
+
+- [Rendezvous hashing (Wikipedia)](https://en.wikipedia.org/wiki/Rendezvous_hashing)
+- [Weighted Distributed Hash Tables](https://pdfs.semanticscholar.org/8c55/282dc37d1e3b46b15c2d97f60568ccb9c9cd.pdf)
+  - This paper describes an efficient method for calculating consistent hash values for heterogeneous nodes.
 
 
 An Informal Benchmark
