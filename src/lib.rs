@@ -314,9 +314,8 @@ impl<N, H> HeterogeneousRendezvousNodes<N, H>
     ///
     /// The higher priority node is located in front of the returned candidate sequence.
     ///
-    /// Note that this method takes `O(n * m + n log n)` steps
-    /// (where `n` is the return value of `self.len()` and
-    /// `m` is the maximum value among the capacities of the nodes.)
+    /// Note that this method takes `O(n log n)` steps
+    /// (where `n` is the return value of `self.len()`).
     pub fn calc_candidates<T: Hash>(&mut self,
                                     item: &T)
                                     -> iterators::heterogeneous::Candidates<N> {
