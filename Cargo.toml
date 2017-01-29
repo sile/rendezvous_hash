@@ -1,6 +1,6 @@
 [package]
 name = "rendezvous_hash"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "An implementation of Rendezvous hashing algorithm"
 documentation = "https://docs.rs/rendezvous_hash"
@@ -14,4 +14,4 @@ license = "MIT"
 siphasher = "0.1"
 
 [dev-dependencies]
-clap = "2.20"
+clap = "2"
