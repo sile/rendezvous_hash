@@ -1,61 +1,39 @@
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::cmp;
 
-use super::{Capacity, NodeHasher};
+use super::NodeHasher;
 
-#[derive(Debug, Clone)]
-pub struct Node<T> {
-    pub node: T,
-    pub hash: u64,
-}
-impl<T> Node<T> {
-    pub fn new(node: T) -> Self {
-        Node {
-            node: node,
-            hash: 0,
-        }
-    }
-}
-impl<T: Hash> Node<T> {
-    pub fn update_hash<H: NodeHasher<T>, U: Hash>(&mut self, hasher: &H, item: &U) {
-        let hash = hasher.hash(&self.node, item);
-        self.hash = hash;
-    }
-}
+/// This trait represents a candidate node for rendezvous.
+pub trait Node {
+    /// Node identifier type.
+    type NodeId: Hash + PartialEq + Ord;
 
-#[derive(Debug, Clone)]
-pub struct WeightedNode<T> {
-    pub node: T,
-    pub capacity: Capacity,
-    pub hash: f64,
+    /// Hash code type.
+    type HashCode: Ord;
+
+    /// Returns the identifier of this node.
+    fn node_id(&self) -> &Self::NodeId;
+
+    /// Returns the hash code for the combination of thid node and `item`.
+    ///
+    /// Note that the time complexity of this function should be constant.
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+        where H: NodeHasher<Self::NodeId>;
 }
-impl<T> WeightedNode<T> {
-    pub fn new(node: T, capacity: Capacity) -> Self {
-        WeightedNode {
-            node: node,
-            capacity: capacity,
-            hash: 0.0,
-        }
+impl<'a> Node for &'a str {
+    type NodeId = Self;
+    type HashCode = u64;
+    fn node_id(&self) -> &Self::NodeId {
+        self
     }
-}
-impl<T: Hash> WeightedNode<T> {
-    pub fn update_hash<H: NodeHasher<T>, U: Hash>(&mut self, hasher: &H, item: &U) {
-        // Uses "Logarithmic Method" described in "Weighted Distributed Hash Tables"
-        use std::u64::MAX;
-        let hash = hasher.hash(&self.node, item) as f64;
-        let distance = (hash / MAX as f64).ln();
-        self.hash = distance / self.capacity.value() as f64;
-    }
-}
-impl<T> WeightedNode<T> {
-    pub fn into_tuple(self) -> (T, Capacity) {
-        (self.node, self.capacity)
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+        where H: NodeHasher<Self::NodeId>
+    {
+        hasher.hash(self, item)
     }
 }
 
 /// Key-Value node.
-///
-/// Only key is used for calculating the hash value of a node.
 #[derive(Debug, Clone)]
 pub struct KeyValueNode<K, V> {
     /// The key of this node.
@@ -64,10 +42,10 @@ pub struct KeyValueNode<K, V> {
     /// The value of this node.
     pub value: V,
 }
-impl<K, V> KeyValueNode<K, V>
-    where K: Hash + Ord + PartialEq
-{
+impl<K, V> KeyValueNode<K, V> {
     /// Makes a new `KeyValueNode` instance.
+    ///
+    /// This is equivalent to `KeyValueNode{node: node, value: value}`.
     pub fn new(key: K, value: V) -> Self {
         KeyValueNode {
             key: key,
@@ -75,24 +53,110 @@ impl<K, V> KeyValueNode<K, V>
         }
     }
 }
-impl<K: Hash, V> Hash for KeyValueNode<K, V> {
-    fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.key.hash(hasher);
+impl<K, V> Node for KeyValueNode<K, V>
+    where K: Hash + PartialEq + Ord
+{
+    type NodeId = K;
+    type HashCode = u64;
+    fn node_id(&self) -> &Self::NodeId {
+        &self.key
+    }
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+        where H: NodeHasher<Self::NodeId>
+    {
+        hasher.hash(self.node_id(), item)
     }
 }
-impl<K: PartialEq, V> PartialEq for KeyValueNode<K, V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
-    }
-}
-impl<K: PartialEq, V> Eq for KeyValueNode<K, V> {}
-impl<K: PartialOrd, V> PartialOrd for KeyValueNode<K, V> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        self.key.partial_cmp(&other.key)
-    }
-}
-impl<K: Ord, V> Ord for KeyValueNode<K, V> {
+
+/// Wrapper of a `f64` value in which `f64::is_sign_positive(self.0)` is always true.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct SignPositiveF64(f64);
+impl Eq for SignPositiveF64 {}
+impl cmp::Ord for SignPositiveF64 {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.key.cmp(&other.key)
+        self.0.partial_cmp(&other.0).unwrap()
+    }
+}
+
+/// The capacity of a weighted node.
+///
+/// "capacity" is a virtual value indicating the resource amount of a node.
+/// For example, if the capacity of a node is twice the other,
+/// the former may be selected by items twice as many times as the latter.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Capacity(f64);
+impl Capacity {
+    /// Makes a new `Capacity` instance.
+    ///
+    /// Note that `capacity` must be a normal and positive value.
+    /// If a value which breaks the condition
+    /// `value.is_normal() && value.is_sign_positive()` is passed,
+    /// this function willl return `None`.
+    pub fn new(value: f64) -> Option<Self> {
+        if value.is_normal() && value.is_sign_positive() {
+            Some(Capacity(value))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the value of this instance.
+    pub fn value(&self) -> f64 {
+        self.0
+    }
+}
+
+/// Weighted node.
+///
+/// This is used for representing a heterogeneous environment in which
+/// there are nodes which have various capacities.
+///
+/// Internally this uses an efficient weighted hash function that
+/// based on the "Logarithmic Method" described in the paper "Weighted Distributed Hash Tables".
+/// So, normally, additional cost for considering node capacity is negligible.
+#[derive(Debug, Clone)]
+pub struct WeightedNode<N> {
+    /// The node.
+    pub node: N,
+
+    /// The capacity of this node.
+    pub capacity: Capacity,
+}
+impl<N: Node> WeightedNode<N> {
+    /// Makes a new `WeightedNode` instance.
+    pub fn new(node: N, capacity: Capacity) -> Self {
+        WeightedNode {
+            node: node,
+            capacity: capacity,
+        }
+    }
+}
+impl<N: Node> Node for WeightedNode<N> {
+    type NodeId = N::NodeId;
+    type HashCode = SignPositiveF64;
+    fn node_id(&self) -> &Self::NodeId {
+        self.node.node_id()
+    }
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+        where H: NodeHasher<Self::NodeId>
+    {
+        use std::u64::MAX;
+        let hash = hasher.hash(self.node_id(), item) as f64;
+        let distance = (hash / MAX as f64).ln();
+        SignPositiveF64(distance / self.capacity.0)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WithHashCode<N: Node> {
+    pub node: N,
+    pub hash_code: Option<N::HashCode>,
+}
+impl<N: Node> WithHashCode<N> {
+    pub fn new(node: N) -> Self {
+        WithHashCode {
+            node: node,
+            hash_code: None,
+        }
     }
 }
