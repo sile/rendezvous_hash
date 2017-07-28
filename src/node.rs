@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::ops::Deref;
 use std::cmp;
 
 use super::NodeHasher;
@@ -18,7 +19,8 @@ pub trait Node {
     ///
     /// Note that the time complexity of this function should be constant.
     fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
-        where H: NodeHasher<Self::NodeId>;
+    where
+        H: NodeHasher<Self::NodeId>;
 }
 impl<'a> Node for &'a str {
     type NodeId = Self;
@@ -27,7 +29,8 @@ impl<'a> Node for &'a str {
         self
     }
     fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
-        where H: NodeHasher<Self::NodeId>
+    where
+        H: NodeHasher<Self::NodeId>,
     {
         hasher.hash(self, item)
     }
@@ -54,7 +57,8 @@ impl<K, V> KeyValueNode<K, V> {
     }
 }
 impl<K, V> Node for KeyValueNode<K, V>
-    where K: Hash + PartialEq + Ord
+where
+    K: Hash + PartialEq + Ord,
 {
     type NodeId = K;
     type HashCode = u64;
@@ -62,7 +66,8 @@ impl<K, V> Node for KeyValueNode<K, V>
         &self.key
     }
     fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
-        where H: NodeHasher<Self::NodeId>
+    where
+        H: NodeHasher<Self::NodeId>,
     {
         hasher.hash(self.node_id(), item)
     }
@@ -138,7 +143,8 @@ impl<N: Node> Node for WeightedNode<N> {
         self.node.node_id()
     }
     fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
-        where H: NodeHasher<Self::NodeId>
+    where
+        H: NodeHasher<Self::NodeId>,
     {
         use std::u64::MAX;
         let hash = hasher.hash(self.node_id(), item) as f64;

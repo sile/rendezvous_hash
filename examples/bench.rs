@@ -11,15 +11,15 @@ use rendezvous_hash::RendezvousNodes;
 
 fn main() {
     let matches = App::new("bench")
-        .arg(Arg::with_name("WORD_FILE")
-            .index(1)
-            .required(true))
-        .arg(Arg::with_name("NODES")
-            .long("nodes")
-            .required(true)
-            .takes_value(true)
-            .min_values(1)
-            .multiple(true))
+        .arg(Arg::with_name("WORD_FILE").index(1).required(true))
+        .arg(
+            Arg::with_name("NODES")
+                .long("nodes")
+                .required(true)
+                .takes_value(true)
+                .min_values(1)
+                .multiple(true),
+        )
         .get_matches();
 
     let filepath = matches.value_of("WORD_FILE").unwrap();
@@ -55,6 +55,8 @@ fn main() {
     let elapsed = end_time - start_time;
     let elapsed_micros = elapsed.as_secs() * 1_000_000 + (elapsed.subsec_nanos() / 1000) as u64;
     println!("ELAPSED: {} ms", elapsed_micros / 1000);
-    println!("WORDS PER SECOND: {}",
-             (((words.len() as f64) / (elapsed_micros as f64)) * 1_000_000.0) as u64);
+    println!(
+        "WORDS PER SECOND: {}",
+        (((words.len() as f64) / (elapsed_micros as f64)) * 1_000_000.0) as u64
+    );
 }

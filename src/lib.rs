@@ -67,7 +67,7 @@ use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
 
-pub use node::{Node, WeightedNode, KeyValueNode, Capacity};
+pub use node::{Node, IdNode, WeightedNode, KeyValueNode, Capacity};
 
 mod node;
 mod iterators_impl;
@@ -138,8 +138,9 @@ pub struct RendezvousNodes<N: Node, H> {
     hasher: H,
 }
 impl<N, H> RendezvousNodes<N, H>
-    where N: Node,
-          H: NodeHasher<N::NodeId>
+where
+    N: Node,
+    H: NodeHasher<N::NodeId>,
 {
     /// Makes a new `RendezvousNodes` instance.
     pub fn new(hasher: H) -> Self {
@@ -161,10 +162,9 @@ impl<N, H> RendezvousNodes<N, H>
             let code = n.node.hash_code(hasher, &item);
             n.hash_code = Some(code);
         }
-        self.nodes
-            .sort_by(|a, b| {
-                (&b.hash_code, b.node.node_id()).cmp(&(&a.hash_code, a.node.node_id()))
-            });
+        self.nodes.sort_by(|a, b| {
+            (&b.hash_code, b.node.node_id()).cmp(&(&a.hash_code, a.node.node_id()))
+        });
         iterators_impl::candidates(self.nodes.iter())
     }
 }
@@ -183,10 +183,14 @@ impl<N: Node, H> RendezvousNodes<N, H> {
     ///
     /// If the node does not exist, this method will return `None`.
     pub fn remove<M>(&mut self, node_id: &M) -> Option<N>
-        where N::NodeId: Borrow<M>,
-              M: PartialEq
+    where
+        N::NodeId: Borrow<M>,
+        M: PartialEq,
     {
-        if let Some(i) = self.nodes.iter().position(|n| n.node.node_id().borrow() == node_id) {
+        if let Some(i) = self.nodes.iter().position(
+            |n| n.node.node_id().borrow() == node_id,
+        )
+        {
             Some(self.nodes.swap_remove(i).node)
         } else {
             None
@@ -195,10 +199,13 @@ impl<N: Node, H> RendezvousNodes<N, H> {
 
     /// Returns `true` if the specified node exists in this candidate set, otherwise `false`.
     pub fn contains<M>(&self, node_id: &M) -> bool
-        where N::NodeId: Borrow<M>,
-              M: PartialEq
+    where
+        N::NodeId: Borrow<M>,
+        M: PartialEq,
     {
-        self.nodes.iter().any(|n| n.node.node_id().borrow() == node_id)
+        self.nodes.iter().any(
+            |n| n.node.node_id().borrow() == node_id,
+        )
     }
 
     /// Returns the count of the candidate nodes.
@@ -225,7 +232,8 @@ impl<N: Node, H> IntoIterator for RendezvousNodes<N, H> {
 }
 impl<N: Node, H> Extend<N> for RendezvousNodes<N, H> {
     fn extend<T>(&mut self, iter: T)
-        where T: IntoIterator<Item = N>
+    where
+        T: IntoIterator<Item = N>,
     {
         for n in iter {
             let _ = self.insert(n);
@@ -245,22 +253,34 @@ mod tests {
         nodes.insert("bar");
         nodes.insert("baz");
         nodes.insert("qux");
-        assert_eq!(nodes.calc_candidates(&1).collect::<Vec<_>>(),
-                   [&"bar", &"baz", &"foo", &"qux"]);
-        assert_eq!(nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-                   [&"qux", &"bar", &"foo", &"baz"]);
+        assert_eq!(
+            nodes.calc_candidates(&1).collect::<Vec<_>>(),
+            [&"bar", &"baz", &"foo", &"qux"]
+        );
+        assert_eq!(
+            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
+            [&"qux", &"bar", &"foo", &"baz"]
+        );
 
         nodes.remove(&"baz");
-        assert_eq!(nodes.calc_candidates(&1).collect::<Vec<_>>(),
-                   [&"bar", &"foo", &"qux"]);
-        assert_eq!(nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-                   [&"qux", &"bar", &"foo"]);
+        assert_eq!(
+            nodes.calc_candidates(&1).collect::<Vec<_>>(),
+            [&"bar", &"foo", &"qux"]
+        );
+        assert_eq!(
+            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
+            [&"qux", &"bar", &"foo"]
+        );
 
         nodes.remove(&"bar");
-        assert_eq!(nodes.calc_candidates(&1).collect::<Vec<_>>(),
-                   [&"foo", &"qux"]);
-        assert_eq!(nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-                   [&"qux", &"foo"]);
+        assert_eq!(
+            nodes.calc_candidates(&1).collect::<Vec<_>>(),
+            [&"foo", &"qux"]
+        );
+        assert_eq!(
+            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
+            [&"qux", &"foo"]
+        );
 
         nodes.insert("bar");
         nodes.insert("baz");
@@ -282,10 +302,20 @@ mod tests {
         nodes.insert(KeyValueNode::new("bar", ()));
         nodes.insert(KeyValueNode::new("baz", ()));
         nodes.insert(KeyValueNode::new("qux", ()));
-        assert_eq!(nodes.calc_candidates(&1).map(|n| &n.key).collect::<Vec<_>>(),
-                   [&"bar", &"baz", &"foo", &"qux"]);
-        assert_eq!(nodes.calc_candidates(&"key").map(|n| &n.key).collect::<Vec<_>>(),
-                   [&"qux", &"bar", &"foo", &"baz"]);
+        assert_eq!(
+            nodes
+                .calc_candidates(&1)
+                .map(|n| &n.key)
+                .collect::<Vec<_>>(),
+            [&"bar", &"baz", &"foo", &"qux"]
+        );
+        assert_eq!(
+            nodes
+                .calc_candidates(&"key")
+                .map(|n| &n.key)
+                .collect::<Vec<_>>(),
+            [&"qux", &"bar", &"foo", &"baz"]
+        );
     }
 
     #[test]
