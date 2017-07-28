@@ -11,7 +11,7 @@ keywords = ["distributed", "hash"]
 license = "MIT"
 
 [dependencies]
-siphasher = "0.1"
+siphasher = "0.2"
 
 [dev-dependencies]
 clap = "2"
