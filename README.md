@@ -2,7 +2,9 @@ rendezvous_hash
 ===============
 
 [![Crates.io: rendezvous_hash](http://meritbadge.herokuapp.com/rendezvous_hash)](https://crates.io/crates/rendezvous_hash)
+[![Documentation](https://docs.rs/rendezvous_hash/badge.svg)](https://docs.rs/rendezvous_hash)
 [![Build Status](https://travis-ci.org/sile/rendezvous_hash.svg?branch=master)](https://travis-ci.org/sile/rendezvous_hash)
+[![Code Coverage](https://codecov.io/gh/sile/rendezvous_hash/branch/master/graph/badge.svg)](https://codecov.io/gh/sile/rendezvous_hash/branch/master)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Rust implementation of Rendezvous (a.k.a, highest random weight) hashing algorithm.
