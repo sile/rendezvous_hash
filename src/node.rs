@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::cmp;
 
 use super::NodeHasher;
@@ -33,6 +33,48 @@ impl<'a> Node for &'a str {
         H: NodeHasher<Self::NodeId>,
     {
         hasher.hash(self, item)
+    }
+}
+
+/// Identity node.
+#[derive(Debug, Clone)]
+pub struct IdNode<T>(T);
+impl<T> IdNode<T> {
+    /// Makes a new `IdNode` instance.
+    pub fn new(node: T) -> Self {
+        IdNode(node)
+    }
+
+    /// Converts into inner node `T`.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+impl<T> Deref for IdNode<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T> DerefMut for IdNode<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl<T> Node for IdNode<T>
+where
+    T: Hash + PartialEq + Ord,
+{
+    type NodeId = T;
+    type HashCode = u64;
+    fn node_id(&self) -> &Self::NodeId {
+        &self.0
+    }
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+    where
+        H: NodeHasher<Self::NodeId>,
+    {
+        hasher.hash(self.node_id(), item)
     }
 }
 
