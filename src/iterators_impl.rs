@@ -1,7 +1,6 @@
-use std::vec;
+use crate::node::{Node, WithHashCode};
 use std::slice;
-
-use node::{Node, WithHashCode};
+use std::vec;
 
 pub fn iter<'a, T: Node>(iter: slice::Iter<'a, WithHashCode<T>>) -> Iter<'a, T> {
     Iter(iter)

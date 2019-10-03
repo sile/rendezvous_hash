@@ -8,6 +8,7 @@ repository = "https://github.com/sile/rendezvous_hash"
 readme = "README.md"
 keywords = ["distributed", "hash"]
 license = "MIT"
+edition = "2018"
 
 [badges]
 travis-ci = {repository = "sile/rendezvous_hash"}

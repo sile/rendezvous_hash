@@ -63,27 +63,27 @@
 #![warn(missing_docs)]
 extern crate siphasher;
 
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use std::borrow::Borrow;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
-pub use node::{Node, IdNode, WeightedNode, KeyValueNode, Capacity};
+pub use node::{Capacity, IdNode, KeyValueNode, Node, WeightedNode};
 
-mod node;
 mod iterators_impl;
+mod node;
 
 pub mod iterators {
     //! `Iterator` trait implementations.
 
-    pub use iterators_impl::Candidates;
-    pub use iterators_impl::Iter;
-    pub use iterators_impl::IntoIter;
+    pub use crate::iterators_impl::Candidates;
+    pub use crate::iterators_impl::IntoIter;
+    pub use crate::iterators_impl::Iter;
 }
 
 pub mod types {
     //! Miscellaneous types.
 
-    pub use node::SignPositiveF64;
+    pub use crate::node::SignPositiveF64;
 }
 
 /// This trait allows calculating the hash value of a node for a specific item.
@@ -187,9 +187,10 @@ impl<N: Node, H> RendezvousNodes<N, H> {
         N::NodeId: Borrow<M>,
         M: PartialEq,
     {
-        if let Some(i) = self.nodes.iter().position(
-            |n| n.node.node_id().borrow() == node_id,
-        )
+        if let Some(i) = self
+            .nodes
+            .iter()
+            .position(|n| n.node.node_id().borrow() == node_id)
         {
             Some(self.nodes.swap_remove(i).node)
         } else {
@@ -203,9 +204,9 @@ impl<N: Node, H> RendezvousNodes<N, H> {
         N::NodeId: Borrow<M>,
         M: PartialEq,
     {
-        self.nodes.iter().any(
-            |n| n.node.node_id().borrow() == node_id,
-        )
+        self.nodes
+            .iter()
+            .any(|n| n.node.node_id().borrow() == node_id)
     }
 
     /// Returns the count of the candidate nodes.
@@ -243,8 +244,8 @@ impl<N: Node, H> Extend<N> for RendezvousNodes<N, H> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn it_works() {
