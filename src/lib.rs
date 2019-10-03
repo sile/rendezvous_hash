@@ -167,6 +167,31 @@ where
         });
         iterators_impl::candidates(self.nodes.iter())
     }
+
+    /// Returns the candidate nodes for `item`.
+    ///
+    /// The higher priority node is located in front of the returned candidate sequence.
+    ///
+    /// Note that this method takes `O(n log n)` steps
+    /// (where `n` is the return value of `self.len()`).
+    ///
+    /// This is equivalent to `calc_candidates` method except this allocates
+    /// `n * (size_of<usize>() + size_of<N::HashCode>())` memory internally.
+    pub fn calc_candidates_immut<T: Hash>(&self, item: &T) -> impl Iterator<Item = &N> {
+        let hasher = &self.hasher;
+        let mut nodes = Vec::with_capacity(self.nodes.len());
+        for n in &self.nodes {
+            let code = n.node.hash_code(hasher, &item);
+            nodes.push(node::WithHashCode {
+                node: &n.node,
+                hash_code: Some(code),
+            });
+        }
+        nodes.sort_by(|a, b| {
+            (&b.hash_code, b.node.node_id()).cmp(&(&a.hash_code, a.node.node_id()))
+        });
+        nodes.into_iter().map(|n| n.node)
+    }
 }
 impl<N: Node, H> RendezvousNodes<N, H> {
     /// Inserts a new candidate node.
@@ -247,6 +272,19 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    macro_rules! assert_calc_candidates {
+        ($nodes:expr, $key:expr, $candidates:expr) => {
+            assert_eq!(
+                $nodes.calc_candidates($key).collect::<Vec<_>>(),
+                $candidates
+            );
+            assert_eq!(
+                $nodes.calc_candidates_immut($key).collect::<Vec<_>>(),
+                $candidates
+            );
+        };
+    }
+
     #[test]
     fn it_works() {
         let mut nodes = RendezvousNodes::default();
@@ -254,34 +292,16 @@ mod tests {
         nodes.insert("bar");
         nodes.insert("baz");
         nodes.insert("qux");
-        assert_eq!(
-            nodes.calc_candidates(&1).collect::<Vec<_>>(),
-            [&"bar", &"baz", &"foo", &"qux"]
-        );
-        assert_eq!(
-            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-            [&"qux", &"bar", &"foo", &"baz"]
-        );
+        assert_calc_candidates!(nodes, &1, [&"bar", &"baz", &"foo", &"qux"]);
+        assert_calc_candidates!(nodes, &"key", [&"qux", &"bar", &"foo", &"baz"]);
 
         nodes.remove(&"baz");
-        assert_eq!(
-            nodes.calc_candidates(&1).collect::<Vec<_>>(),
-            [&"bar", &"foo", &"qux"]
-        );
-        assert_eq!(
-            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-            [&"qux", &"bar", &"foo"]
-        );
+        assert_calc_candidates!(nodes, &1, [&"bar", &"foo", &"qux"]);
+        assert_calc_candidates!(nodes, &"key", [&"qux", &"bar", &"foo"]);
 
         nodes.remove(&"bar");
-        assert_eq!(
-            nodes.calc_candidates(&1).collect::<Vec<_>>(),
-            [&"foo", &"qux"]
-        );
-        assert_eq!(
-            nodes.calc_candidates(&"key").collect::<Vec<_>>(),
-            [&"qux", &"foo"]
-        );
+        assert_calc_candidates!(nodes, &1, [&"foo", &"qux"]);
+        assert_calc_candidates!(nodes, &"key", [&"qux", &"foo"]);
 
         nodes.insert("bar");
         nodes.insert("baz");

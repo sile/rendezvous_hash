@@ -22,6 +22,19 @@ pub trait Node {
     where
         H: NodeHasher<Self::NodeId>;
 }
+impl<T: Node> Node for &T {
+    type NodeId = T::NodeId;
+    type HashCode = T::HashCode;
+    fn node_id(&self) -> &Self::NodeId {
+        (**self).node_id()
+    }
+    fn hash_code<H, U: Hash>(&self, hasher: &H, item: &U) -> Self::HashCode
+    where
+        H: NodeHasher<Self::NodeId>,
+    {
+        (**self).hash_code(hasher, item)
+    }
+}
 impl<'a> Node for &'a str {
     type NodeId = Self;
     type HashCode = u64;
