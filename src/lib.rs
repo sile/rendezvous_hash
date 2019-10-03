@@ -182,15 +182,10 @@ where
         let mut nodes = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
             let code = n.node.hash_code(hasher, &item);
-            nodes.push(node::WithHashCode {
-                node: &n.node,
-                hash_code: Some(code),
-            });
+            nodes.push((&n.node, code));
         }
-        nodes.sort_by(|a, b| {
-            (&b.hash_code, b.node.node_id()).cmp(&(&a.hash_code, a.node.node_id()))
-        });
-        nodes.into_iter().map(|n| n.node)
+        nodes.sort_by(|a, b| (&b.1, b.0.node_id()).cmp(&(&a.1, a.0.node_id())));
+        nodes.into_iter().map(|n| n.0)
     }
 }
 impl<N: Node, H> RendezvousNodes<N, H> {
