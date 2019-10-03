@@ -1,13 +1,13 @@
 extern crate clap;
 extern crate rendezvous_hash;
 
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
-use std::fs::File;
-use std::iter::FromIterator;
-use std::time::Instant;
 use clap::{App, Arg};
 use rendezvous_hash::RendezvousNodes;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::iter::FromIterator;
+use std::time::Instant;
 
 fn main() {
     let matches = App::new("bench")

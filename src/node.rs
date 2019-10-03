@@ -1,6 +1,6 @@
+use std::cmp;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
-use std::cmp;
 
 use super::NodeHasher;
 
