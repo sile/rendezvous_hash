@@ -105,10 +105,7 @@ impl<K, V> KeyValueNode<K, V> {
     ///
     /// This is equivalent to `KeyValueNode{node: node, value: value}`.
     pub fn new(key: K, value: V) -> Self {
-        KeyValueNode {
-            key: key,
-            value: value,
-        }
+        KeyValueNode { key, value }
     }
 }
 impl<K, V> Node for KeyValueNode<K, V>
@@ -161,7 +158,7 @@ impl Capacity {
     }
 
     /// Returns the value of this instance.
-    pub fn value(&self) -> f64 {
+    pub fn value(self) -> f64 {
         self.0
     }
 }
@@ -185,10 +182,7 @@ pub struct WeightedNode<N> {
 impl<N: Node> WeightedNode<N> {
     /// Makes a new `WeightedNode` instance.
     pub fn new(node: N, capacity: Capacity) -> Self {
-        WeightedNode {
-            node: node,
-            capacity: capacity,
-        }
+        WeightedNode { node, capacity }
     }
 }
 impl<N: Node> Node for WeightedNode<N> {
@@ -216,7 +210,7 @@ pub struct WithHashCode<N: Node> {
 impl<N: Node> WithHashCode<N> {
     pub fn new(node: N) -> Self {
         WithHashCode {
-            node: node,
+            node,
             hash_code: None,
         }
     }

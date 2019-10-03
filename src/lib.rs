@@ -115,7 +115,7 @@ pub trait NodeHasher<N> {
 /// hasher.finish()
 /// # ;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct DefaultNodeHasher(());
 impl DefaultNodeHasher {
     /// Makes a new `DefaultNodeHasher` instance.
@@ -146,7 +146,7 @@ where
     pub fn new(hasher: H) -> Self {
         RendezvousNodes {
             nodes: Vec::new(),
-            hasher: hasher,
+            hasher,
         }
     }
 
@@ -232,6 +232,11 @@ impl<N: Node, H> RendezvousNodes<N, H> {
         self.nodes
             .iter()
             .any(|n| n.node.node_id().borrow() == node_id)
+    }
+
+    /// Returns `true` if there are no candidate nodes.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
     }
 
     /// Returns the count of the candidate nodes.
