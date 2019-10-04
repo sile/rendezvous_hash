@@ -1,6 +1,6 @@
 [package]
 name = "rendezvous_hash"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "An implementation of Rendezvous hashing algorithm"
 homepage = "https://github.com/sile/rendezvous_hash"
