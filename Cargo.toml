@@ -15,7 +15,6 @@ travis-ci = {repository = "sile/rendezvous_hash"}
 codecov = {repository = "sile/rendezvous_hash"}
 
 [dependencies]
-siphasher = "0.2"
 
 [dev-dependencies]
 clap = "2"
