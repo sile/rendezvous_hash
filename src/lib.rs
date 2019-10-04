@@ -67,15 +67,7 @@ use std::hash::{Hash, Hasher};
 
 pub use node::{Capacity, IdNode, KeyValueNode, Node, WeightedNode};
 
-mod iterators_impl;
 mod node;
-
-pub mod iterators {
-    //! `Iterator` trait implementations.
-
-    pub use crate::iterators_impl::IntoIter;
-    pub use crate::iterators_impl::Iter;
-}
 
 pub mod types {
     //! Miscellaneous types.
@@ -214,8 +206,8 @@ impl<N: Node, H> RendezvousNodes<N, H> {
     }
 
     /// Returns an iterator over the nodes of this candidate set.
-    pub fn iter(&self) -> iterators::Iter<N> {
-        iterators_impl::iter(self.nodes.iter())
+    pub fn iter(&self) -> impl Iterator<Item = &N> {
+        self.nodes.iter()
     }
 }
 impl<N: Node> Default for RendezvousNodes<N, DefaultNodeHasher> {
@@ -225,9 +217,9 @@ impl<N: Node> Default for RendezvousNodes<N, DefaultNodeHasher> {
 }
 impl<N: Node, H> IntoIterator for RendezvousNodes<N, H> {
     type Item = N;
-    type IntoIter = iterators::IntoIter<N>;
+    type IntoIter = std::vec::IntoIter<N>;
     fn into_iter(self) -> Self::IntoIter {
-        iterators_impl::into_iter(self.nodes.into_iter())
+        self.nodes.into_iter()
     }
 }
 impl<N: Node, H> Extend<N> for RendezvousNodes<N, H> {
