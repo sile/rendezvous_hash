@@ -73,7 +73,6 @@ mod node;
 pub mod iterators {
     //! `Iterator` trait implementations.
 
-    pub use crate::iterators_impl::Candidates;
     pub use crate::iterators_impl::IntoIter;
     pub use crate::iterators_impl::Iter;
 }
@@ -154,35 +153,14 @@ where
     ///
     /// Note that this method takes `O(n log n)` steps
     /// (where `n` is the return value of `self.len()`).
-    pub fn calc_candidates<T: Hash>(&mut self, item: &T) -> iterators::Candidates<N> {
-        let hasher = &self.hasher;
-        for n in self.nodes.iter_mut() {
-            let code = n.node.hash_code(hasher, &item);
-            n.hash_code = Some(code);
-        }
-        self.nodes.sort_by(|a, b| {
-            (&b.hash_code, b.node.node_id()).cmp(&(&a.hash_code, a.node.node_id()))
-        });
-        iterators_impl::candidates(self.nodes.iter())
-    }
-
-    /// Returns the candidate nodes for `item`.
-    ///
-    /// The higher priority node is located in front of the returned candidate sequence.
-    ///
-    /// Note that this method takes `O(n log n)` steps
-    /// (where `n` is the return value of `self.len()`).
-    ///
-    /// This is equivalent to `calc_candidates` method except this allocates
-    /// `n * (size_of<usize>() + size_of<N::HashCode>())` memory internally.
-    pub fn calc_candidates_immut<T: Hash>(&self, item: &T) -> impl Iterator<Item = &N> {
+    pub fn calc_candidates<T: Hash>(&self, item: &T) -> impl Iterator<Item = &N> {
         let hasher = &self.hasher;
         let mut nodes = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
             let code = n.node.hash_code(hasher, &item);
             nodes.push((&n.node, code));
         }
-        nodes.sort_by(|a, b| (&b.1, b.0.node_id()).cmp(&(&a.1, a.0.node_id())));
+        nodes.sort_unstable_by(|a, b| (&b.1, b.0.node_id()).cmp(&(&a.1, a.0.node_id())));
         nodes.into_iter().map(|n| n.0)
     }
 }
@@ -274,10 +252,6 @@ mod tests {
         ($nodes:expr, $key:expr, $candidates:expr) => {
             assert_eq!(
                 $nodes.calc_candidates($key).collect::<Vec<_>>(),
-                $candidates
-            );
-            assert_eq!(
-                $nodes.calc_candidates_immut($key).collect::<Vec<_>>(),
                 $candidates
             );
         };

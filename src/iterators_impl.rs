@@ -33,21 +33,3 @@ impl<T: Node> Iterator for IntoIter<T> {
         self.0.size_hint()
     }
 }
-
-pub fn candidates<'a, N: 'a + Node>(inner: slice::Iter<'a, WithHashCode<N>>) -> Candidates<N> {
-    Candidates(inner)
-}
-
-/// An iterator which represents a sequence of the candidate nodes for a rendezvous.
-///
-/// The higher priority node is placed in front of this sequence.
-pub struct Candidates<'a, N: 'a + Node>(slice::Iter<'a, WithHashCode<N>>);
-impl<'a, N: 'a + Node> Iterator for Candidates<'a, N> {
-    type Item = &'a N;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|n| &n.node)
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
