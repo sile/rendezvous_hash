@@ -131,7 +131,7 @@ impl<N: Hash> NodeHasher<N> for DefaultNodeHasher {
 
 /// A candidate node set of a rendezvous for clients that are requiring the same item.
 pub struct RendezvousNodes<N: Node, H> {
-    nodes: Vec<node::WithHashCode<N>>,
+    nodes: Vec<N>,
     hasher: H,
 }
 impl<N, H> RendezvousNodes<N, H>
@@ -157,8 +157,8 @@ where
         let hasher = &self.hasher;
         let mut nodes = Vec::with_capacity(self.nodes.len());
         for n in &self.nodes {
-            let code = n.node.hash_code(hasher, &item);
-            nodes.push((&n.node, code));
+            let code = n.hash_code(hasher, &item);
+            nodes.push((n, code));
         }
         nodes.sort_unstable_by(|a, b| (&b.1, b.0.node_id()).cmp(&(&a.1, a.0.node_id())));
         nodes.into_iter().map(|n| n.0)
@@ -171,7 +171,7 @@ impl<N: Node, H> RendezvousNodes<N, H> {
     /// it will be removed and returned as `Some(N)`.
     pub fn insert(&mut self, node: N) -> Option<N> {
         let old = self.remove(node.node_id());
-        self.nodes.push(node::WithHashCode::new(node));
+        self.nodes.push(node);
         old
     }
 
@@ -186,9 +186,9 @@ impl<N: Node, H> RendezvousNodes<N, H> {
         if let Some(i) = self
             .nodes
             .iter()
-            .position(|n| n.node.node_id().borrow() == node_id)
+            .position(|n| n.node_id().borrow() == node_id)
         {
-            Some(self.nodes.swap_remove(i).node)
+            Some(self.nodes.swap_remove(i))
         } else {
             None
         }
@@ -200,9 +200,7 @@ impl<N: Node, H> RendezvousNodes<N, H> {
         N::NodeId: Borrow<M>,
         M: PartialEq,
     {
-        self.nodes
-            .iter()
-            .any(|n| n.node.node_id().borrow() == node_id)
+        self.nodes.iter().any(|n| n.node_id().borrow() == node_id)
     }
 
     /// Returns `true` if there are no candidate nodes.

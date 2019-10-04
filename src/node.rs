@@ -201,17 +201,3 @@ impl<N: Node> Node for WeightedNode<N> {
         SignPositiveF64(distance / self.capacity.0)
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct WithHashCode<N: Node> {
-    pub node: N,
-    pub hash_code: Option<N::HashCode>,
-}
-impl<N: Node> WithHashCode<N> {
-    pub fn new(node: N) -> Self {
-        WithHashCode {
-            node,
-            hash_code: None,
-        }
-    }
-}
